@@ -10,7 +10,8 @@
     "build": "tsc",
     "db:generate": "npx drizzle-kit generate",
     "db:migrate": "cross-env DB_MIGRATING=true npx drizzle-kit migrate",
-    "db:seed": "cross-env DB_SEEDING=true tsx src/db/seed.ts"
+    "db:seed": "cross-env DB_SEEDING=true tsx src/db/seed.ts",
+    "db:studio": "pnpm drizzle-kit studio"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^7.2.0",

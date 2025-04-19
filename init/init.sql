@@ -1,0 +1,3 @@
+CREATE USER starteradmin WITH PASSWORD 'Starter123';
+CREATE DATABASE starter;
+GRANT ALL PRIVILEGES ON DATABASE starter TO starteradmin;
