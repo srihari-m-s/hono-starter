@@ -7,6 +7,7 @@
     "lint": "eslint .",
     "lint:fix": "pnpm lint --fix",
     "typecheck": "tsc --noEmit",
+    "build": "tsc",
     "db:generate": "npx drizzle-kit generate",
     "db:migrate": "cross-env DB_MIGRATING=true npx drizzle-kit migrate",
     "db:seed": "cross-env DB_SEEDING=true tsx src/db/seed.ts"
