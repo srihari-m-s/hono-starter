@@ -12,11 +12,12 @@ import { z } from "@hono/zod-openapi";
 import { eq } from "drizzle-orm";
 import { setCookie } from "hono/cookie";
 import { sign, verify } from "hono/jwt";
-import type { JWTPayload } from "hono/utils/jwt/types";
 import {
   getUserByIdentifier,
   getUserList,
+  getUserSelectFields,
   getUserWithId,
+  isUniqueViolation,
   updateUserEmailVerification,
 } from "./helpers";
 import type {
@@ -42,10 +43,23 @@ export const signUp: AppRouteHandler<SignUpRoute> = async (c) => {
 
   const newUser = { ...user, password: hashedPassword };
 
-  const [{ password, ...insertedUser }] = await db
-    .insert(usersTable)
-    .values(newUser)
-    .returning();
+  let insertedUser: Awaited<ReturnType<typeof getUserWithId>>;
+
+  try {
+    [insertedUser] = await db
+      .insert(usersTable)
+      .values(newUser)
+      .returning(getUserSelectFields());
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      return c.json(
+        { message: HttpStatusPhrases.CONFLICT },
+        HttpStatusCodes.CONFLICT,
+      );
+    }
+    throw error;
+  }
+
   return c.json(insertedUser, HttpStatusCodes.OK);
 };
 
@@ -71,19 +85,19 @@ export const patch: AppRouteHandler<PatchRoute> = async (c) => {
   const updatedUser = c.req.valid("json");
 
   const { id } = c.req.valid("param");
-  const [{ password, ...user }] = await db
+  const [updated] = await db
     .update(usersTable)
     .set(updatedUser)
     .where(eq(usersTable.id, id))
-    .returning();
+    .returning(getUserSelectFields());
 
-  if (!user)
+  if (!updated)
     return c.json(
       { message: HttpStatusPhrases.NOT_FOUND },
       HttpStatusCodes.NOT_FOUND,
     );
 
-  return c.json(user, HttpStatusCodes.OK);
+  return c.json(updated, HttpStatusCodes.OK);
 };
 
 export const remove: AppRouteHandler<RemoveRoute> = async (c) => {
@@ -110,10 +124,6 @@ export const login: AppRouteHandler<LoginRoute> = async (c) => {
     .string()
     .regex(/^[0-9]{10}$/)
     .safeParse(payload.identifier).success;
-
-  if (!isEmail && !isMobile) {
-    return unauthorizedResponse(c);
-  }
 
   if (!isEmail && !isMobile) {
     return unauthorizedResponse(c);
@@ -164,13 +174,6 @@ export const forgotPassword: AppRouteHandler<ForgotPasswordRoute> = async (
     return notFoundResponse(c);
   }
 
-  const slugTokenPayload: JWTPayload = {
-    userId: user.id,
-    exp: Math.floor(Date.now() / 1000) + 60 * 15,
-  };
-
-  const slug = await sign(slugTokenPayload, env.AUTH_SECRET);
-
   return c.json(
     { message: `Reset link has been sent to ${email}` },
     HttpStatusCodes.OK,
@@ -184,7 +187,7 @@ export const resetPassword: AppRouteHandler<ResetPasswordRoute> = async (c) => {
   let userId: number = 0;
 
   try {
-    const decoded = await verify(slug, env.AUTH_SECRET);
+    const decoded = await verify(slug, env.AUTH_SECRET, "HS256");
     userId = Number(decoded.userId);
   } catch {
     return c.json({ message: "Link Expired!" }, HttpStatusCodes.FORBIDDEN);

@@ -8,7 +8,7 @@ export const usersTable = pgTable("users", {
   lastName: text("last_name"),
   email: text("email").notNull().unique(),
   mobile: text("mobile").notNull().unique(),
-  password: text("password").notNull().unique(),
+  password: text("password").notNull(),
   emailVerifiedAt: timestamp("email_verified_at", {
     mode: "string",
   })
@@ -30,9 +30,9 @@ export const selectUsersSchema = fullSelectUsersSchema
   .openapi("SingleUser");
 
 const insertUsersSchema = createInsertSchema(usersTable, {
-  firstName: (s) => s.firstName.min(3).max(256),
-  mobile: (s) => s.mobile.min(10),
-  email: (s) => s.email.email(),
+  firstName: (s) => s.min(3).max(256),
+  mobile: (s) => s.min(10),
+  email: (s) => s.email(),
 });
 
 export const signUpUsersSchema = insertUsersSchema

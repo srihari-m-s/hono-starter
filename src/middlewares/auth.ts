@@ -6,6 +6,7 @@ export const authMiddleware = (c: Context, next: Next) => {
   const jwtMiddleware = jwt({
     secret: env.AUTH_SECRET,
     cookie: env.AUTH_COOKIE,
+    alg: "HS256",
   });
 
   return jwtMiddleware(c, next);

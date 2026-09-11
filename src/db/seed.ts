@@ -1,5 +1,6 @@
-import { db } from "./index"; // adjust path if needed
-import { notesTable, usersTable } from "./schema"; // adjust path if needed
+import { connection, db } from "./index";
+import { notesTable, usersTable } from "./schema";
+import { hashPassword } from "../lib/protect-password";
 
 async function seed() {
   console.log("🌱 Seeding the database...");
@@ -9,14 +10,14 @@ async function seed() {
   await db.delete(usersTable);
 
   // Insert one admin user
-    await db
+  await db
     .insert(usersTable)
     .values({
       firstName: "Admin",
       lastName: "User",
       email: "admin@example.com",
       mobile: "1234567890",
-      password: "Admin1234$%", // hash if needed
+      password: await hashPassword("Admin1234$%"),
       emailVerifiedAt: new Date().toISOString(),
     })
     .returning();
@@ -31,6 +32,8 @@ async function seed() {
   await db.insert(notesTable).values(notes);
 
   console.log("✅ Seeding complete.");
+
+  await connection.end();
 }
 
 seed().catch((err) => {

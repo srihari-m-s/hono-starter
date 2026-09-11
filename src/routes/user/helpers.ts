@@ -66,6 +66,27 @@ export async function getUserByIdentifier(
 }
 
 /**
+ * Detects a PostgreSQL unique-violation error (SQLSTATE 23505).
+ *
+ * Thrown when an insert or update violates a unique constraint (e.g. a
+ * duplicate email or mobile on signup). Drizzle wraps driver errors in a
+ * `DrizzleQueryError`, so the original postgres error is found via `cause`.
+ */
+export function isUniqueViolation(error: unknown, depth = 5): boolean {
+  if (depth < 0 || typeof error !== "object" || error === null) {
+    return false;
+  }
+
+  if ("code" in error && (error as { code?: unknown }).code === "23505") {
+    return true;
+  }
+
+  return "cause" in error
+    ? isUniqueViolation((error as { cause?: unknown }).cause, depth - 1)
+    : false;
+}
+
+/**
  * Updates a user's email verification date in the database.
  *
  * @param {number} userId - The unique identifier of the user to update.

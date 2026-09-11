@@ -18,6 +18,7 @@ export const insertNotesSchema = fullNotesSchema
   .pick({
     content: true,
   })
+  .partial()
   .openapi("NoteCreate");
 
 export const readNoteSchema = fullNotesSchema.openapi("Note");
