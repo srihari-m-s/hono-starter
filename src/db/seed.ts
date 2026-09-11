@@ -1,5 +1,5 @@
-import { db } from "./index"; // adjust path if needed
-import { notesTable, usersTable } from "./schema"; // adjust path if needed
+import { connection, db } from "./index";
+import { notesTable, usersTable } from "./schema";
 import { hashPassword } from "../lib/protect-password";
 
 async function seed() {
@@ -32,6 +32,8 @@ async function seed() {
   await db.insert(notesTable).values(notes);
 
   console.log("✅ Seeding complete.");
+
+  await connection.end();
 }
 
 seed().catch((err) => {

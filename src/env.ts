@@ -5,12 +5,12 @@ import { expand } from "dotenv-expand";
 
 expand(config());
 
-const stringBoolean = z.coerce
-  .string()
+const stringBoolean = z
+  .enum(["true", "false"])
+  .default("false")
   .transform((val) => {
     return val === "true";
-  })
-  .default("false");
+  });
 
 const EnvSchema = z.object({
   NODE_ENV: z.string().default("development"),

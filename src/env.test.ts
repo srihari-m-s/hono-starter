@@ -30,7 +30,8 @@ describe("parseEnv", () => {
   });
 
   test("throws when AUTH_SECRET is missing", () => {
-    const { AUTH_SECRET: _, ...rest } = validEnv;
+    const rest = { ...validEnv } as Partial<typeof validEnv>;
+    delete rest.AUTH_SECRET;
     expect(() => parseEnv(rest)).toThrow();
   });
 

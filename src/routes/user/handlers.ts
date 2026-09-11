@@ -12,10 +12,10 @@ import { z } from "@hono/zod-openapi";
 import { eq } from "drizzle-orm";
 import { setCookie } from "hono/cookie";
 import { sign, verify } from "hono/jwt";
-import type { JWTPayload } from "hono/utils/jwt/types";
 import {
   getUserByIdentifier,
   getUserList,
+  getUserSelectFields,
   getUserWithId,
   updateUserEmailVerification,
 } from "./helpers";
@@ -42,10 +42,10 @@ export const signUp: AppRouteHandler<SignUpRoute> = async (c) => {
 
   const newUser = { ...user, password: hashedPassword };
 
-  const [{ password, ...insertedUser }] = await db
+  const [insertedUser] = await db
     .insert(usersTable)
     .values(newUser)
-    .returning();
+    .returning(getUserSelectFields());
   return c.json(insertedUser, HttpStatusCodes.OK);
 };
 
@@ -75,7 +75,7 @@ export const patch: AppRouteHandler<PatchRoute> = async (c) => {
     .update(usersTable)
     .set(updatedUser)
     .where(eq(usersTable.id, id))
-    .returning();
+    .returning(getUserSelectFields());
 
   if (!updated)
     return c.json(
@@ -83,9 +83,7 @@ export const patch: AppRouteHandler<PatchRoute> = async (c) => {
       HttpStatusCodes.NOT_FOUND,
     );
 
-  const { password, ...user } = updated;
-
-  return c.json(user, HttpStatusCodes.OK);
+  return c.json(updated, HttpStatusCodes.OK);
 };
 
 export const remove: AppRouteHandler<RemoveRoute> = async (c) => {
@@ -161,13 +159,6 @@ export const forgotPassword: AppRouteHandler<ForgotPasswordRoute> = async (
   if (!user) {
     return notFoundResponse(c);
   }
-
-  const slugTokenPayload: JWTPayload = {
-    userId: user.id,
-    exp: Math.floor(Date.now() / 1000) + 60 * 15,
-  };
-
-  const slug = await sign(slugTokenPayload, env.AUTH_SECRET);
 
   return c.json(
     { message: `Reset link has been sent to ${email}` },
