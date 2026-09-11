@@ -40,7 +40,7 @@ describe("user sign up", () => {
     expect(body.error).toBeTruthy();
   });
 
-  test("rejects a duplicate email", async () => {
+  test("rejects a duplicate email with 409", async () => {
     const email = randomEmail("dup");
     await createUserWithPassword(PASSWORD, { email });
     const res = await app.request("/users/sign_up", {
@@ -48,7 +48,9 @@ describe("user sign up", () => {
       headers: jsonHeaders(),
       body: JSON.stringify(makeUser({ email })),
     });
-    expect(res.status).toBeGreaterThanOrEqual(500);
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { message: string };
+    expect(body.message).toBe("Conflict");
   });
 });
 

@@ -17,6 +17,7 @@ import {
   getUserList,
   getUserSelectFields,
   getUserWithId,
+  isUniqueViolation,
   updateUserEmailVerification,
 } from "./helpers";
 import type {
@@ -42,10 +43,23 @@ export const signUp: AppRouteHandler<SignUpRoute> = async (c) => {
 
   const newUser = { ...user, password: hashedPassword };
 
-  const [insertedUser] = await db
-    .insert(usersTable)
-    .values(newUser)
-    .returning(getUserSelectFields());
+  let insertedUser: Awaited<ReturnType<typeof getUserWithId>>;
+
+  try {
+    [insertedUser] = await db
+      .insert(usersTable)
+      .values(newUser)
+      .returning(getUserSelectFields());
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      return c.json(
+        { message: HttpStatusPhrases.CONFLICT },
+        HttpStatusCodes.CONFLICT,
+      );
+    }
+    throw error;
+  }
+
   return c.json(insertedUser, HttpStatusCodes.OK);
 };
 

@@ -37,6 +37,10 @@ export const signUp = createRoute({
       createErrorSchema(signUpUsersSchema),
       "users signUp error",
     ),
+    [HttpStatusCodes.CONFLICT]: jsonContent(
+      createMessageObjectSchema(HttpStatusPhrases.CONFLICT),
+      "email or mobile already registered",
+    ),
   },
 });
 export type SignUpRoute = typeof signUp;
