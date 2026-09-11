@@ -41,10 +41,14 @@ const EnvSchema = z.object({
 
 export type Env = z.infer<typeof EnvSchema>;
 
+export function parseEnv(input: NodeJS.ProcessEnv): Env {
+  return EnvSchema.parse(input);
+}
+
 let env: Env;
 
 try {
-  env = EnvSchema.parse(process.env);
+  env = parseEnv(process.env);
 } catch (e) {
   const error = e as ZodError;
   console.error("❌ Invalid env:");

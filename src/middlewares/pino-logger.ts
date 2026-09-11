@@ -13,7 +13,10 @@ export function usePinoLogger() {
         options: { destination: logFilePath, mkdir: true },
       },
       formatters: {
-        log: (log) => ({ ...log, reqId: crypto.randomUUID() }),
+        log: (log: Record<string, unknown>) => ({
+          ...log,
+          reqId: crypto.randomUUID(),
+        }),
       },
     },
   });

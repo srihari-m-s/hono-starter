@@ -8,7 +8,10 @@ export const connection = postgres(env.DATABASE_URL, {
   onnotice: env.DB_SEEDING ? () => {} : undefined,
 });
 
-export const db = drizzle(connection, { schema: schemas, logger: true });
+export const db = drizzle(connection, {
+  schema: schemas,
+  logger: env.NODE_ENV !== 'test',
+});
 
 export type db = typeof db;
 

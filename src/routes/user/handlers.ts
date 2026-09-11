@@ -71,17 +71,19 @@ export const patch: AppRouteHandler<PatchRoute> = async (c) => {
   const updatedUser = c.req.valid("json");
 
   const { id } = c.req.valid("param");
-  const [{ password, ...user }] = await db
+  const [updated] = await db
     .update(usersTable)
     .set(updatedUser)
     .where(eq(usersTable.id, id))
     .returning();
 
-  if (!user)
+  if (!updated)
     return c.json(
       { message: HttpStatusPhrases.NOT_FOUND },
       HttpStatusCodes.NOT_FOUND,
     );
+
+  const { password, ...user } = updated;
 
   return c.json(user, HttpStatusCodes.OK);
 };
@@ -110,10 +112,6 @@ export const login: AppRouteHandler<LoginRoute> = async (c) => {
     .string()
     .regex(/^[0-9]{10}$/)
     .safeParse(payload.identifier).success;
-
-  if (!isEmail && !isMobile) {
-    return unauthorizedResponse(c);
-  }
 
   if (!isEmail && !isMobile) {
     return unauthorizedResponse(c);
@@ -184,7 +182,7 @@ export const resetPassword: AppRouteHandler<ResetPasswordRoute> = async (c) => {
   let userId: number = 0;
 
   try {
-    const decoded = await verify(slug, env.AUTH_SECRET);
+    const decoded = await verify(slug, env.AUTH_SECRET, "HS256");
     userId = Number(decoded.userId);
   } catch {
     return c.json({ message: "Link Expired!" }, HttpStatusCodes.FORBIDDEN);
