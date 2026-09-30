@@ -1,5 +1,6 @@
 import { unauthorizedResponse } from "@/lib/constants";
 import { HttpStatusCodes } from "@/lib/http-status-codes";
+import type { AppBindings } from "@/lib/types";
 import type { ErrorHandler } from "hono";
 import { onError } from "stoker/middlewares";
 
@@ -7,7 +8,7 @@ import { onError } from "stoker/middlewares";
  * Error handler middleware to handle errors and provide a custom response based on the error status.
  *
  * @param {Error} err - The error object that triggered this handler.
- * @param {Context} c - The Hono context object representing the request and response.
+ * @param {Context} c - The Hono context object representing the request.
  * @returns {Response} - A custom unauthorized response if the error status is 401 (UNAUTHORIZED),
  *                       otherwise it calls a generic error handler.
  *
@@ -17,7 +18,7 @@ import { onError } from "stoker/middlewares";
  * // Usage in a Hono app setup:
  * app.use('*', handleError);
  */
-export const handleError: ErrorHandler = (err, c) => {
+export const handleError: ErrorHandler<AppBindings> = (err, c) => {
   const currentStatus = "status" in err ? err.status : undefined;
 
   if (currentStatus === HttpStatusCodes.UNAUTHORIZED) {

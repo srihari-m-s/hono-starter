@@ -1,9 +1,16 @@
 import app from "@/app";
 import { db } from "@/db";
-import { usersTable } from "@/db/schema";
-import { hashPassword } from "@/lib/protect-password";
+import { usersTable, type UserRole } from "@/db/schema";
+import { lastEmailTo } from "@/lib/mailer";
+import { hashPassword } from "@/lib/password";
 
-const VALID_PASSWORD = "TestPass123!";
+export const VALID_PASSWORD = "TestPassphrase123!";
+
+/**
+ * Long enough to satisfy the 15-character floor but present on the common
+ * password blocklist, so it isolates the policy check from schema validation.
+ */
+export const COMMON_PASSWORD = "password123456789";
 
 export type TestApp = typeof app;
 
@@ -27,6 +34,7 @@ export interface NewUser {
   lastName: string;
   email: string;
   mobile: string;
+  role: UserRole;
 }
 
 export function makeUser(overrides: Partial<NewUser> = {}): NewUser {
@@ -35,51 +43,103 @@ export function makeUser(overrides: Partial<NewUser> = {}): NewUser {
     lastName: "User",
     email: randomEmail(),
     mobile: randomMobile(),
+    role: "user",
     ...overrides,
   };
 }
 
-/** Sign up through the public API. Returns the created user body. */
-export async function signUp(overrides: Partial<NewUser> = {}) {
-  const user = makeUser(overrides);
-  const res = await app.request("/users/sign_up", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(user),
-  });
-  if (res.status !== 200) {
-    throw new Error(`signUp failed: ${res.status} ${await res.text()}`);
-  }
-  const created = (await res.json()) as Record<string, unknown>;
-  return { user, created, res };
+export function jsonHeaders(): Record<string, string> {
+  return { "content-type": "application/json" };
 }
 
-/** Insert a user directly into the DB with a known password. */
+/**
+ * Signs up through the public API. The account is created unverified, exactly
+ * as a real client would get it.
+ */
+export async function signUp(
+  overrides: Partial<NewUser> & { password?: string } = {},
+) {
+  const { password = VALID_PASSWORD, ...userOverrides } = overrides;
+  const user = makeUser(userOverrides);
+
+  const res = await app.request("/auth/sign_up", {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify({ ...user, password }),
+  });
+
+  if (res.status !== 201) {
+    throw new Error(`signUp failed: ${res.status} ${await res.text()}`);
+  }
+
+  const created = (await res.json()) as Record<string, unknown>;
+  return { user, password, created, res };
+}
+
+/**
+ * Signs up and immediately verifies the address using the token from the
+ * captured verification email — the same path a real user takes.
+ */
+export async function signUpVerified(
+  overrides: Partial<NewUser> & { password?: string } = {},
+) {
+  const result = await signUp(overrides);
+  const token = tokenFromLastEmail(result.user.email);
+
+  const res = await app.request("/auth/verify_email", {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify({ token }),
+  });
+
+  if (res.status !== 200) {
+    throw new Error(`verifyEmail failed: ${res.status} ${await res.text()}`);
+  }
+
+  return result;
+}
+
+/**
+ * Inserts a user directly with a known password and an already-verified
+ * address, for tests that are not about the signup or verification flow.
+ */
 export async function createUserWithPassword(
   password = VALID_PASSWORD,
   overrides: Partial<NewUser> = {},
 ) {
   const user = makeUser(overrides);
+
   const [row] = await db
     .insert(usersTable)
-    .values({ ...user, password: await hashPassword(password) })
+    .values({
+      ...user,
+      password: await hashPassword(password),
+      emailVerifiedAt: new Date().toISOString(),
+    })
     .returning();
+
   return { user, password, row };
 }
 
 /** Log in through the public API. Returns the response and Set-Cookie value. */
 export async function login(identifier: string, password: string) {
-  const res = await app.request("/users/login", {
+  const res = await app.request("/auth/login", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: jsonHeaders(),
     body: JSON.stringify({ identifier, password }),
   });
+
   return { res, cookie: res.headers.get("set-cookie") };
 }
 
 /** Build an auth header for protected routes from a Set-Cookie value. */
 export function cookieHeader(cookie: string): Record<string, string> {
-  return { Cookie: cookie.split(";")[0] };
+  return { Cookie: cookie.split(";")[0] ?? "" };
+}
+
+/** Extract the raw Set-Cookie value (just `name=value`). */
+export function cookiePair(setCookie: string): string {
+  return setCookie.split(";")[0] ?? "";
 }
 
 export async function loggedInUser(overrides: Partial<NewUser> = {}) {
@@ -88,12 +148,41 @@ export async function loggedInUser(overrides: Partial<NewUser> = {}) {
     overrides,
   );
   const { res, cookie } = await login(user.email, password);
+
   if (res.status !== 200 || !cookie) {
     throw new Error(`login failed: ${res.status} ${await res.text()}`);
   }
+
   return { user, password, row, cookie };
 }
 
-export function jsonHeaders(): Record<string, string> {
-  return { "content-type": "application/json" };
+/** A logged-in caller with the `admin` role. */
+export function loggedInAdmin(overrides: Partial<NewUser> = {}) {
+  return loggedInUser({ role: "admin", ...overrides });
+}
+
+/** Pulls the `token:` line out of the last email sent to an address. */
+export function tokenFromLastEmail(address: string): string {
+  const message = lastEmailTo(address);
+  if (!message) throw new Error(`no email was sent to ${address}`);
+
+  const match = message.text.match(/token:\s*(\S+)/);
+  if (!match?.[1]) throw new Error(`no token found in email to ${address}`);
+
+  return match[1];
+}
+
+/** Drives the forgot-password flow and returns the reset token. */
+export async function requestPasswordReset(email: string): Promise<string> {
+  const res = await app.request("/auth/forgot_password", {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify({ email }),
+  });
+
+  if (res.status !== 200) {
+    throw new Error(`forgotPassword failed: ${res.status} ${await res.text()}`);
+  }
+
+  return tokenFromLastEmail(email);
 }

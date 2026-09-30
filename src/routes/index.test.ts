@@ -32,3 +32,50 @@ describe("index route", () => {
     expect(body.message.startsWith("Not Found")).toBe(true);
   });
 });
+
+describe("cross-origin policy", () => {
+  test("allows CORS for a configured origin", async () => {
+    const res = await app.request("/", {
+      headers: { Origin: "http://localhost:5173" },
+    });
+
+    expect(res.headers.get("access-control-allow-origin")).toBe(
+      "http://localhost:5173",
+    );
+    expect(res.headers.get("access-control-allow-credentials")).toBe("true");
+  });
+
+  test("withholds CORS for an unknown origin", async () => {
+    const res = await app.request("/", {
+      headers: { Origin: "https://evil.example" },
+    });
+
+    expect(res.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
+  test("rejects a state-changing request from an unknown origin", async () => {
+    const res = await app.request("/auth/login", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        Origin: "https://evil.example",
+      },
+      body: JSON.stringify({ identifier: "a@b.com", password: "whatever" }),
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  test("lets a configured origin reach the handler", async () => {
+    const res = await app.request("/auth/login", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        Origin: "http://localhost:5173",
+      },
+      body: JSON.stringify({ identifier: "a@b.com", password: "whatever" }),
+    });
+
+    expect(res.status).toBe(401);
+  });
+});

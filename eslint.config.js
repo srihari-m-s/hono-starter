@@ -21,6 +21,22 @@ export default defineConfig([
   },
   tseslint.configs.recommended,
   {
+    files: ["**/*.{js,mjs,cjs,ts}"],
+    rules: {
+      // Allow `_`-prefixed names for intentionally unused bindings, and the
+      // `const { omit, ...rest }` idiom used to strip fields from an object.
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+          ignoreRestSiblings: true,
+        },
+      ],
+    },
+  },
+  {
     files: ["**/*.css"],
     plugins: { css },
     language: "css/css",
