@@ -9,3 +9,12 @@ services:
       - ${DB_PORT}:5432
     volumes:
       - ./db-data:/var/lib/postgresql/data
+
+  # Local SMTP catcher. Anything the app sends to localhost:1025 shows up at
+  # http://localhost:8025, so you can exercise MAIL_TRANSPORT=smtp without a
+  # provider account. See the Email section of the README.
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # web UI
